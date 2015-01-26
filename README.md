@@ -35,6 +35,20 @@ To transmit DMX you need an RS485-transceiver chip. Hooking up a MAX485 is simpl
   <img src="MAX485-Schematic.png" alt="Schematic" width="768" height="412">
 </p>
 
+## Flashing
+
+Use the spark-cli tools to upload the firmware (typically stored in core-firmware.bin) to your spark core. Press and hold "MODE"-Button (also called USER-Button) while pressing "RESET". Release "MODE" button as soon as the core flashes yellow (takes approx 3 seconds).
+
+<pre># spark flash --usb core-firmware.bin</pre>
+
+The Spark Core should boot automatically the new firmware.
+
+## Spark Cloud Features
+
+To improve the stability of the firmware I disabled the Spark Cloud. To revert to any other firmware using Spark Cloud IDE you need to set SYSTEM_MODE to AUTOMATIC or flash any other Cloud-enabled firmware like Tinker:
+
+<pre># spark flash --usb tinker</pre>
+
 ## Sources
 - Spark Core port of DMX transmission is based on this project: https://github.com/KyotoFox/Spark-ArtNet-DMX
 - DMX transmission is based on this repo: https://code.google.com/p/stm32-dmx512/
