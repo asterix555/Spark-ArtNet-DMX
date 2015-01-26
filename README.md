@@ -1,26 +1,28 @@
-# Spark Core ArtNet RX/DMX TX
-This is a simple application for the Spark Core that receives ArtNet over WiFi and transmits it over DMX.
+# Spark Core UDP to DMX
+This is a simple application for the Spark Core that receives DMX-Values over WiFi and transmits it over DMX.
 
-The received DMX universe is stored and transmitted over DMX with a refresh rate of 25Hz.
+The received DMX data is stored and transmitted over DMX with a refresh rate of 25Hz.
 
-The color of the RGB LED is determined by the first 3 channels and the small blue LED toggles every time the DMX universe is sent.
+The color of the RGB LED is determined by the first 3 channels and the small blue LED toggles every time the DMX universe is sent. The Outputs D0-D7 are set to DMX Values 1-8 (D0 and D1 as PWM, rest as digital).
+
+## Usage
+
+Send the command(s) to Spark Core IP, Port 3200 (TCP or UDP):
+__< Mode >< DMX-Channel >[,< DMX-Value >,[< Fading-Time >]][;< Next Command >]__
+
+Where mode is __S__ for set or __F__ for fade, DMX-Channel as a single Channel from 1-512 and Value from 0-255.
+
+On unix for example:
+<pre>
+# echo "S1,255;F2,255;F3,128" | nc -u sparkcore.lan 3200
+</pre>
+
+This will set Channel 1 instantly to 255 (=100%) and softly fade Channel 2 to 255 (100%) and Channel 3 to 128 (50%).
 
 
 ## Compiling
 __This code will not work in Sparks online IDE!__
 You have to compile it yourself or upload the firmware without changes.
-
-The reason for this is that the buffer in Sparks UDP library is set to 512 bytes.
-ArtDMX-packages are 530 in length, so only the last 18 bytes will be received by the application.
-To receive ArtDMX packages, change
-
-`#define RX_BUF_MAX_SIZE	512`
-to
-
-`#define RX_BUF_MAX_SIZE	576`
-
-in the file `core-firmware/inc/spark_wiring_udp.h`
-
 
 Check out Sparks repository for information on compiling: https://github.com/spark/core-firmware
 
