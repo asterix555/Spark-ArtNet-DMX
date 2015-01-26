@@ -10,6 +10,7 @@ This code integrates great to home-automation-servers such as openHAB, Loxone or
 ## Usage
 
 Send the command(s) to Spark Core IP, Port 3200 (TCP or UDP):
+
 __< Mode >< DMX-Channel >[,< DMX-Value >,[< Fading-Time >]][;< Next Command >]__
 
 Where mode is __S__ for set or __F__ for fade, DMX-Channel as a single Channel from 1-512 and Value from 0-255.
