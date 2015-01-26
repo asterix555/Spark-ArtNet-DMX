@@ -5,6 +5,8 @@ The received DMX data is stored and transmitted over DMX with a refresh rate of 
 
 The color of the RGB LED is determined by the first 3 channels and the small blue LED toggles every time the DMX universe is sent. The Outputs D0-D7 are set to DMX Values 1-8 (D0 and D1 as PWM, rest as digital).
 
+This code integrates great to home-automation-servers such as openHAB, Loxone or many others as you can use simple commands for one specific channel. If you use ArtNet you have to send all 512 channels at once, using this code you can set or fade any channel with a simple packet.
+
 ## Usage
 
 Send the command(s) to Spark Core IP, Port 3200 (TCP or UDP):
