@@ -34,5 +34,5 @@ To transmit DMX you need an RS485-transceiver chip. Hooking up a MAX485 is simpl
 </p>
 
 ## Sources
-- ArtNet reception is based on this gist: https://gist.github.com/deftx/9377546
+- Spark Core port of DMX transmission is based on this project: https://github.com/KyotoFox/Spark-ArtNet-DMX
 - DMX transmission is based on this repo: https://code.google.com/p/stm32-dmx512/
