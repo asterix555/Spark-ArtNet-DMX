@@ -7,9 +7,6 @@
  D7 (PA13)  Blue LED
  */
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
-// SYSTEM_MODE(AUTOMATIC);
-
 uint8_t dmxData[512], dmxDataPrevious[512]; // Index 0 is DMX channel 1
 uint8_t dmxFade[512]; // DMX-Fade-To Values
 uint8_t dmxFadingTime[512]; // DMX-Fade-To Values
@@ -19,16 +16,20 @@ unsigned long timeNow, timeLast;
 
 /* ========== Configuration ========== */
 // #define DELAY 1
+#define ENABLE_SPARKCLOUD 0
 #define ENABLE_DMX 1        // enable DMX Output
 #define ENABLE_DMX_DE_RE 0  // enable DE/!RE lines
 #define ENABLE_DELAY 10     // wait n-seconds until DMX-Sequence is sent to outputs
-#define ENABLE_TCP 1        // Listen for TCP packets
+#define ENABLE_TCP 0        // Listen for TCP packets
 #define ENABLE_UDP 1        // Listen for UDP packets
 #define DEBUG_NET  0        // return Debugging-Code to network-clients
 
+#define BAUD_RATE 9600    // set Baud-Rate for USB-Serial debugging console
+                            // 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, or 115200
+
 // Show DMX-Table, (cols * rows = number of shown DMX Channels)
 #define DEBUG_DMX_COLS  8   // Number of cols
-#define DEBUG_DMX_ROWS  32  // Number of rows
+#define DEBUG_DMX_ROWS  8  // Number of rows
 
 #define PACKETSIZE_MIN  2   // Minimum and
 #define PACKETSIZE_MAX  512 // Maximum length of an valid Packet
@@ -90,11 +91,18 @@ TCPClient client;
 UDP Udp;
 #endif
 
+#if ENABLE_SPARKCLOUD
+SYSTEM_MODE(SEMI_AUTOMATIC);
+#else
+SYSTEM_MODE(MANUAL);
+#endif
+
 void udpSend(String message) {
     Serial.print("> " + message);
     message += "\n";
 
 #if DEBUG_NET
+
 #if ENABLE_TCP
     if (client.connected()) {
         server.write(message.c_str());
@@ -114,7 +122,6 @@ void udpSend(String message) {
 #endif
 
 #endif
-    Serial.println(" - Done");
 }
 
 #if ENABLE_DMX
@@ -196,7 +203,7 @@ void setupDMX() {
 void setup() {
     toggle_runled();
     // USB Serial for debugging
-    Serial.begin(9600);
+    Serial.begin(BAUD_RATE);
 
 #if ENABLE_DMX
     // DMX
@@ -425,20 +432,21 @@ void checkDmxServer(uint8_t packetType) {
             // udpSend("Evaluating Packet (Size: " + String(packetLen, DEC) + ")");
             processPacket(packetLen, packetType);
         }
+    }
+    
 
 #if ENABLE_TCP
-        if (packetType == TYPE_UDP) {
-            client.flush();
-            client.stop();
-        }
+    if (packetType == TYPE_UDP) {
+        client.flush();
+        client.stop();
+    }
 #endif
 
 #if ENABLE_UDP
-        if (packetType == TYPE_UDP) {
-            Udp.flush();
-        }
-#endif
+    if (packetType == TYPE_UDP) {
+        Udp.flush();
     }
+#endif
 }
 
 void printDmxValue(uint16_t value) {
@@ -457,12 +465,15 @@ void printStatus() {
         Serial.println("ONLINE");
         toggle_runled();
         Serial.print("| Spark Cloud Status:  ");
+#if ENABLE_SPARKCLOUD
         if (Spark.connected()) {
             Serial.println("ONLINE");
         } else {
             Serial.println("OFFLINE");
-            WiFi.connect();
         }
+#else
+        Serial.println("DISABLED");
+#endif
 
 
         Serial.print("| IP:                  ");
@@ -536,26 +547,26 @@ void loop() {
     uint16_t dmxChannel = 0;
 
     n++;
-    if (n % 20 == 0) {
-        if (!WiFi.ready()) {
-            // Fast flash: WiFi not connected
-            toggle_runled();
-        } else if (n % 200 == 0) {
-            // Slow flash: WiFi connected
-            toggle_runled();
-
-            if (!udpStarted && Udp.begin(localPort)) {
-                udpStarted = 1;
-            }
-            // Spark.process();
+    if (n % 200 == 0) {
+        if (!udpStarted && Udp.begin(localPort)) {
+            udpStarted = 1;
         }
+#if ENABLE_SPARKCLOUD
+        Spark.process();
+#endif
         if (n % 10000 == 0) {
             printStatus();
-            /*
-             * if (Spark.connected() == false) {
-                Spark.connect();
+        }
+
+        if (n % 5000 == 0) {
+
+#if ENABLE_SPARKCLOUD
+            if (Spark.connected() == false) {
+                Serial.println("=================================================================");
+                Serial.println("|                  Connecting to SPARK CLOUD                    |");
+                Serial.println("|===============================================================|");
             }
-             */
+#endif
         }
     }
 
@@ -610,10 +621,12 @@ void loop() {
                     case A5:
                     case A6:
                     case A7:
-                        Serial.print("Value of PWM pin ");
+/*
+ *                         Serial.print("Value of PWM pin ");
                         Serial.print(pin, DEC);
                         Serial.print(" changed to ");
                         Serial.println(dmxData[dmxChannel - 1], DEC);
+*/
                         analogWrite(pin, dmxData[dmxChannel - 1]);
                         break;
 
@@ -624,14 +637,16 @@ void loop() {
                     case D5:
                     case D6:
                     case D7:
-                        if ((dmxFade[dmxChannel - 1] >= 128) != (dmxDataPrevious[dmxChannel - 1] >= 128)) {
-                            // Write digital Values instantly (ignoring fade)
-                            Serial.print("Value of digital pin ");
+                        if ((dmxData[dmxChannel - 1] >= 128) != (dmxDataPrevious[dmxChannel - 1] >= 128)) {
+                            // Write digital Values according current fade status
+/*                            Serial.print("Value of digital pin ");
                             Serial.print(pin, DEC);
                             Serial.print(" changed to ");
-                            Serial.println((dmxFade[dmxChannel - 1] >= 128), DEC);
-                            analogWrite(pin, dmxData[dmxChannel - 1]);
-                            digitalWrite(pin, (dmxFade[dmxChannel - 1] >= 128));
+                            Serial.println((dmxData[dmxChannel - 1] >= 128), DEC);
+                            Serial.print(" --> was ");
+                            Serial.println((dmxDataPrevious[dmxChannel - 1] >= 128), DEC);
+*/
+                            digitalWrite(pin, (dmxData[dmxChannel - 1] >= 128));
                             break;
                         }
                 }
