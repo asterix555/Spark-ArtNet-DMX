@@ -16,7 +16,7 @@ unsigned long timeNow, timeLast;
 
 /* ========== Configuration ========== */
 // #define DELAY 1
-#define ENABLE_SPARKCLOUD 0
+#define ENABLE_SPARKCLOUD 1
 #define ENABLE_DMX 1        // enable DMX Output
 #define ENABLE_DMX_DE_RE 0  // enable DE/!RE lines
 #define ENABLE_DELAY 10     // wait n-seconds until DMX-Sequence is sent to outputs
@@ -122,6 +122,7 @@ void udpSend(String message) {
 #endif
 
 #endif
+    Serial.println();
 }
 
 #if ENABLE_DMX
@@ -550,7 +551,7 @@ void loop() {
     if (n % 200 == 0) {
         if (!udpStarted && Udp.begin(localPort)) {
             udpStarted = 1;
-        }
+        }   
 #if ENABLE_SPARKCLOUD
         Spark.process();
 #endif
@@ -565,6 +566,7 @@ void loop() {
                 Serial.println("=================================================================");
                 Serial.println("|                  Connecting to SPARK CLOUD                    |");
                 Serial.println("|===============================================================|");
+                Spark.connect();
             }
 #endif
         }
