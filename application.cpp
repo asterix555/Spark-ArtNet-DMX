@@ -16,16 +16,17 @@ unsigned long timeNow, timeLast;
 
 /* ========== Configuration ========== */
 // #define DELAY 1
-#define ENABLE_SPARKCLOUD 1
+#define ENABLE_SPARKCLOUD 0
 #define ENABLE_DMX 1        // enable DMX Output
 #define ENABLE_DMX_DE_RE 0  // enable DE/!RE lines
 #define ENABLE_DELAY 10     // wait n-seconds until DMX-Sequence is sent to outputs
 #define ENABLE_TCP 0        // Listen for TCP packets
 #define ENABLE_UDP 1        // Listen for UDP packets
+#define ENABLE_SERIAL  0        // return Debugging-Code to serial
 #define DEBUG_NET  0        // return Debugging-Code to network-clients
 
 #define BAUD_RATE 9600    // set Baud-Rate for USB-Serial debugging console
-                            // 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, or 115200
+// 300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 38400, 57600, or 115200
 
 // Show DMX-Table, (cols * rows = number of shown DMX Channels)
 #define DEBUG_DMX_COLS  8   // Number of cols
@@ -92,14 +93,23 @@ UDP Udp;
 #endif
 
 #if ENABLE_SPARKCLOUD
-SYSTEM_MODE(SEMI_AUTOMATIC);
+SYSTEM_MODE(AUTOMATIC);
 #else
 SYSTEM_MODE(MANUAL);
 #endif
 
+#if ENABLE_SERIAL
+bool serialStarted = 0;
+#endif
+
 void udpSend(String message) {
-    Serial.print("> " + message);
+
+#if ENABLE_SERIAL
+    if (serialStarted) {
+        Serial.print("> " + message);
+    }
     message += "\n";
+#endif
 
 #if DEBUG_NET
 
@@ -122,8 +132,15 @@ void udpSend(String message) {
 #endif
 
 #endif
-    Serial.println();
+
+#if ENABLE_SERIAL
+    if (serialStarted) {
+        Serial.println();
+    }
+#endif
+
 }
+
 
 #if ENABLE_DMX
 bool dmxStarted = 0;
@@ -204,14 +221,14 @@ void setupDMX() {
 void setup() {
     toggle_runled();
     // USB Serial for debugging
+#if ENABLE_SERIAL
     Serial.begin(BAUD_RATE);
+#endif
 
 #if ENABLE_DMX
     // DMX
     setupDMX();
 #endif
-    // Control the RGB LED
-    RGB.control(true);
 
     uint8_t pinNumber = 0;
     for (pinNumber = 0; pinNumber < 8; pinNumber++) {
@@ -268,8 +285,9 @@ void processPacket(int16_t &packetLen, uint8_t packetType) {
     char c = 0;
 
     // while (packetSize > PACKETSIZE_MIN && packetSize <= PACKETSIZE_MAX) // Check size to avoid unnecessary checks
+    toggle_runled();
+
     for (uint16_t pos = 0; pos < packetLen; pos++) {
-        toggle_runled();
 
 
 #if ENABLE_TCP
@@ -369,19 +387,30 @@ void processPacket(int16_t &packetLen, uint8_t packetType) {
                 status = 0;
             }
         }
-        toggle_runled();
     }
+    toggle_runled();
+
 #ifdef ENABLE_DMX
     if (!dmxStarted) {
 #ifdef ENABLE_DELAY
         // Start DMX Output after n seconds.  
         if (millis() > ENABLE_DELAY * 1000) {
 #endif
-            Serial.print("Starting DMX transmission:");
+
+#if ENABLE_SERIAL
+            if (serialStarted) {
+                Serial.print("Starting DMX transmission:");
+            }
+#endif
             TIM_Cmd(TIM3, ENABLE);
             TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
             dmxStarted = 1;
-            Serial.println(" done");
+
+#if ENABLE_SERIAL
+            if (serialStarted) {
+                Serial.println(" done");
+            }
+#endif
 #ifdef ENABLE_DELAY
         }
 #endif
@@ -410,23 +439,27 @@ void checkDmxServer(uint8_t packetType) {
 #endif
 
     if (packetLen) {
-        Serial.print("Client Connected: ");
+#if ENABLE_SERIAL
+        if (serialStarted) {
+            Serial.print("Client Connected: ");
 
 #if ENABLE_UDP
-        if (packetType == TYPE_UDP) {
-            Serial.print("UDP, Remote IP: ");
-            Serial.print(Udp.remoteIP());
-        }
+            if (packetType == TYPE_UDP) {
+                Serial.print("UDP, Remote IP: ");
+                Serial.print(Udp.remoteIP());
+            }
 #endif
 #if ENABLE_TCP
-        if (packetType == TYPE_TCP) {
-            Serial.print("TCP");
-        }
+            if (packetType == TYPE_TCP) {
+                Serial.print("TCP");
+            }
 #endif
 
-        Serial.print(", Length: ");
-        Serial.print(packetLen, DEC);
-        Serial.println(" bytes");
+            Serial.print(", Length: ");
+            Serial.print(packetLen, DEC);
+            Serial.println(" bytes");
+        }
+#endif
 
         if (packetLen >= PACKETSIZE_MIN && packetLen <= PACKETSIZE_MAX) {
 
@@ -434,7 +467,7 @@ void checkDmxServer(uint8_t packetType) {
             processPacket(packetLen, packetType);
         }
     }
-    
+
 
 #if ENABLE_TCP
     if (packetType == TYPE_UDP) {
@@ -451,97 +484,105 @@ void checkDmxServer(uint8_t packetType) {
 }
 
 void printDmxValue(uint16_t value) {
-    if (value < 10) Serial.print(" ");
-    if (value < 100) Serial.print(" ");
-    Serial.print(value, DEC);
+#if ENABLE_SERIAL    
+    if (serialStarted) {
+        if (value < 10) Serial.print(" ");
+        if (value < 100) Serial.print(" ");
+        Serial.print(value, DEC);
+    }
+#endif
 }
 
 void printStatus() {
-    Serial.println();
-    Serial.println("================================================================");
-    Serial.println("|                NETWORK STATUS ---- SPARK CORE                |");
-    Serial.println("|==============================================================|");
-    Serial.print("| WiFi-Status:         ");
-    if (WiFi.ready()) {
-        Serial.println("ONLINE");
-        toggle_runled();
-        Serial.print("| Spark Cloud Status:  ");
-#if ENABLE_SPARKCLOUD
-        if (Spark.connected()) {
+#if ENABLE_SERIAL
+    if (serialStarted) {
+        Serial.println();
+        Serial.println("================================================================");
+        Serial.println("|                NETWORK STATUS ---- SPARK CORE                |");
+        Serial.println("|==============================================================|");
+        Serial.print("| WiFi-Status:         ");
+        if (WiFi.ready()) {
             Serial.println("ONLINE");
-        } else {
-            Serial.println("OFFLINE");
-        }
+            toggle_runled();
+            Serial.print("| Spark Cloud Status:  ");
+#if ENABLE_SPARKCLOUD
+            if (Spark.connected()) {
+                Serial.println("ONLINE");
+            } else {
+                Serial.println("OFFLINE");
+            }
 #else
-        Serial.println("DISABLED");
+            Serial.println("DISABLED");
 #endif
 
 
-        Serial.print("| IP:                  ");
-        Serial.print(WiFi.localIP());
-        Serial.print(" (");
-        Serial.print(WiFi.subnetMask());
-        Serial.println(")");
-        Serial.print("| Gateway:             ");
-        Serial.println(WiFi.gatewayIP());
-        Serial.print("| WiFi Network (SSID): ");
-        Serial.println(WiFi.SSID());
-    } else {
-        Serial.println("Offline");
-    }
+            Serial.print("| IP:                  ");
+            Serial.print(WiFi.localIP());
+            Serial.print(" (");
+            Serial.print(WiFi.subnetMask());
+            Serial.println(")");
+            Serial.print("| Gateway:             ");
+            Serial.println(WiFi.gatewayIP());
+            Serial.print("| WiFi Network (SSID): ");
+            Serial.println(WiFi.SSID());
+        } else {
+            Serial.println("Offline");
+        }
 
-    if (WiFi.hasCredentials()) {
-        // Serial.println("WiFi credentials stored:    ");
-    } else {
-        Serial.println("| No WiFi credentials stored!");
-    }
+        if (WiFi.hasCredentials()) {
+            // Serial.println("WiFi credentials stored:    ");
+        } else {
+            Serial.println("| No WiFi credentials stored!");
+        }
 
-    Serial.println("================================================================");
+        Serial.println("================================================================");
 
-    Serial.print("| Listening to: ");
+        Serial.print("| Listening to: ");
 
 
 #if ENABLE_TCP
-    Serial.print("TCP, ");
+        Serial.print("TCP, ");
 #endif
 
 #if ENABLE_UDP
-    Serial.print("UDP, ");
+        Serial.print("UDP, ");
 #endif
 
-    Serial.print("Port: ");
-    Serial.println(localPort, DEC);
+        Serial.print("Port: ");
+        Serial.println(localPort, DEC);
 
-    Serial.println("================================================================");
-    Serial.println();
+        Serial.println("================================================================");
+        Serial.println();
 
 
-    Serial.println("=================================================================");
-    Serial.println("|                  DMX STATUS ---- SPARK CORE                   |");
-    Serial.println("|===============================================================|");
-    Serial.println("|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|");
+        Serial.println("=================================================================");
+        Serial.println("|                  DMX STATUS ---- SPARK CORE                   |");
+        Serial.println("|===============================================================|");
+        Serial.println("|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|");
 
-    uint16_t dmxChannel;
-    for (uint8_t row = 0; row < DEBUG_DMX_ROWS; row++) {
+        uint16_t dmxChannel;
+        for (uint8_t row = 0; row < DEBUG_DMX_ROWS; row++) {
 
-        for (uint8_t col = 0; col < DEBUG_DMX_COLS; col++) {
-            dmxChannel = row + DEBUG_DMX_ROWS * col + 1;
-            if (dmxChannel > 512) {
-                Serial.print("|   -   ");
-            } else {
-                Serial.print("|");
-                printDmxValue(dmxChannel);
-                Serial.print(" ");
-                printDmxValue(dmxData[dmxChannel - 1]);
+            for (uint8_t col = 0; col < DEBUG_DMX_COLS; col++) {
+                dmxChannel = row + DEBUG_DMX_ROWS * col + 1;
+                if (dmxChannel > 512) {
+                    Serial.print("|   -   ");
+                } else {
+                    Serial.print("|");
+                    printDmxValue(dmxChannel);
+                    Serial.print(" ");
+                    printDmxValue(dmxData[dmxChannel - 1]);
+                }
             }
+            Serial.println("|");
         }
-        Serial.println("|");
+
+        Serial.println("|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|");
+        Serial.println("|===============================================================|");
+
+        Serial.println();
     }
-
-    Serial.println("|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|Ch.=Val|");
-    Serial.println("|===============================================================|");
-
-    Serial.println();
+#endif
 }
 
 void loop() {
@@ -549,33 +590,50 @@ void loop() {
 
     n++;
     if (n % 200 == 0) {
+        if (!WiFi.ready()) {
+            toggle_runled();
+        }
         if (!udpStarted && Udp.begin(localPort)) {
             udpStarted = 1;
-        }   
+        }
 #if ENABLE_SPARKCLOUD
-        Spark.process();
+        // Spark.process();
 #endif
         if (n % 10000 == 0) {
             printStatus();
         }
 
         if (n % 5000 == 0) {
+            if (WiFi.ready()) {
+
+                // Control the RGB LED
+                RGB.control(true);
+                toggle_runled();
+            } else {
+                RGB.control(false);
+            }
 
 #if ENABLE_SPARKCLOUD
             if (Spark.connected() == false) {
-                Serial.println("=================================================================");
-                Serial.println("|                  Connecting to SPARK CLOUD                    |");
-                Serial.println("|===============================================================|");
+#if ENABLE_SERIAL
+                if (serialStarted) {
+                    Serial.println("=================================================================");
+                    Serial.println("|                  Connecting to SPARK CLOUD                    |");
+                    Serial.println("|===============================================================|");
+                }
+#endif
                 Spark.connect();
             }
 #endif
         }
     }
-
+#if ENABLE_SERIAL
     if (Serial.available()) {
+        serialStarted = 1;
         Serial.read();
         printStatus();
     }
+#endif
 
 #if ENABLE_UDP
     checkDmxServer(TYPE_UDP);
@@ -596,8 +654,9 @@ void loop() {
         }
 
         timeLast = timeNow;
-        RGB.color(dmxData[0] / 2, dmxData[1] / 2, dmxData[2] / 2);
-
+        if (WiFi.ready()) {
+            RGB.color(dmxData[0] / 2, dmxData[1] / 2, dmxData[2] / 2);
+        }
         uint8_t pin = 0;
 
         for (dmxChannel = 1; dmxChannel <= 16; dmxChannel++) {
@@ -623,12 +682,12 @@ void loop() {
                     case A5:
                     case A6:
                     case A7:
-/*
- *                         Serial.print("Value of PWM pin ");
-                        Serial.print(pin, DEC);
-                        Serial.print(" changed to ");
-                        Serial.println(dmxData[dmxChannel - 1], DEC);
-*/
+                        /*
+                         *                         Serial.print("Value of PWM pin ");
+                                                Serial.print(pin, DEC);
+                                                Serial.print(" changed to ");
+                                                Serial.println(dmxData[dmxChannel - 1], DEC);
+                         */
                         analogWrite(pin, dmxData[dmxChannel - 1]);
                         break;
 
@@ -641,13 +700,13 @@ void loop() {
                     case D7:
                         if ((dmxData[dmxChannel - 1] >= 128) != (dmxDataPrevious[dmxChannel - 1] >= 128)) {
                             // Write digital Values according current fade status
-/*                            Serial.print("Value of digital pin ");
-                            Serial.print(pin, DEC);
-                            Serial.print(" changed to ");
-                            Serial.println((dmxData[dmxChannel - 1] >= 128), DEC);
-                            Serial.print(" --> was ");
-                            Serial.println((dmxDataPrevious[dmxChannel - 1] >= 128), DEC);
-*/
+                            /*                            Serial.print("Value of digital pin ");
+                                                        Serial.print(pin, DEC);
+                                                        Serial.print(" changed to ");
+                                                        Serial.println((dmxData[dmxChannel - 1] >= 128), DEC);
+                                                        Serial.print(" --> was ");
+                                                        Serial.println((dmxDataPrevious[dmxChannel - 1] >= 128), DEC);
+                             */
                             digitalWrite(pin, (dmxData[dmxChannel - 1] >= 128));
                             break;
                         }
@@ -681,14 +740,14 @@ extern "C" void Wiring_TIM3_Interrupt_Handler_override() {
         toggle_usart2_de_re();
 #endif
 
-        // 100µs break
+        // 100Âµs break
         tim2_wait_usec(100);
 
         // bring the TX pin under UART control
         // this has the added effect that the pin is high
         set_pa2_uart();
 
-        // 12µs MAB (Mark After Break)
+        // 12Âµs MAB (Mark After Break)
         tim2_wait_usec(12);
 
         usart2_tx_and_wait(0);
@@ -713,7 +772,7 @@ extern "C" void Wiring_TIM3_Interrupt_Handler_override() {
          * END Time critical code
          */
 
-        toggle_runled();
+        // toggle_runled();
     }
 }
 #endif
